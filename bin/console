@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+#/ Usage: bin/console
+#/ Description: Starts an interactive console/REPL for the project
+#/ 
+#/ This provides an interactive environment with the project loaded.
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+parse_common_args "$@"
+
+print_color blue "Starting interactive console..."
+
+# Node.js
+if [ -f "package.json" ]; then
+    if grep -q '"console"' package.json; then
+        run_command "npm run console" "Starting custom console"
+    else
+        run_command "node" "Starting Node.js REPL"
+    fi
+
+# Python
+elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "Pipfile" ]; then
+    if [ -f "manage.py" ]; then
+        # Django shell
+        run_command "python3 manage.py shell" "Starting Django shell"
+    elif command_exists ipython; then
+        run_command "ipython" "Starting IPython"
+    else
+        run_command "python3" "Starting Python REPL"
+    fi
+
+# Ruby
+elif [ -f "Gemfile" ]; then
+    if grep -q "rails" Gemfile && [ -f "bin/rails" ]; then
+        run_command "bin/rails console" "Starting Rails console"
+    elif command_exists irb; then
+        run_command "bundle exec irb" "Starting Ruby IRB"
+    fi
+
+# .NET
+elif compgen -G "*.csproj" > /dev/null; then
+    if command_exists dotnet-script; then
+        run_command "dotnet-script" "Starting C# interactive"
+    else
+        print_color yellow "Install dotnet-script for interactive C#: dotnet tool install -g dotnet-script"
+        run_command "dotnet run" "Running project"
+    fi
+
+# Go
+elif [ -f "go.mod" ]; then
+    if command_exists gore; then
+        run_command "gore" "Starting Go REPL"
+    else
+        print_color yellow "Install gore for Go REPL: go install github.com/x-motemen/gore/cmd/gore@latest"
+    fi
+
+# Rust
+elif [ -f "Cargo.toml" ]; then
+    if command_exists evcxr; then
+        run_command "evcxr" "Starting Rust REPL"
+    else
+        print_color yellow "Install evcxr for Rust REPL: cargo install evcxr_repl"
+    fi
+
+else
+    error "No recognized project type for console"
+    exit 1
+fi

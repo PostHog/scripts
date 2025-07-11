@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#/ Usage: bin/setup
+#/ Description: Sets up the project for the first time
+#/ 
+#/ This script is idempotent and can be run multiple times.
+#/ It will check for and install system dependencies.
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+parse_common_args "$@"
+
+print_color blue "Setting up project..."
+
+# Example: Check for common development tools
+# Customize based on your project needs
+
+# Node.js projects
+if [ -f "package.json" ]; then
+    require_commands node npm
+    print_color green "✓ Node.js environment detected"
+fi
+
+# Python projects
+if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "Pipfile" ]; then
+    require_commands python3
+    print_color green "✓ Python environment detected"
+fi
+
+# Ruby projects
+if [ -f "Gemfile" ]; then
+    require_commands ruby bundle
+    print_color green "✓ Ruby environment detected"
+fi
+
+# .NET projects
+if [ -f "*.sln" ] || [ -f "*.csproj" ]; then
+    require_commands dotnet
+    print_color green "✓ .NET environment detected"
+fi
+
+# Go projects
+if [ -f "go.mod" ]; then
+    require_commands go
+    print_color green "✓ Go environment detected"
+fi
+
+# Run bootstrap to install dependencies
+print_color blue "Running bootstrap..."
+bin/bootstrap
+
+print_color green "Setup complete! Run 'bin/start' to start the application."

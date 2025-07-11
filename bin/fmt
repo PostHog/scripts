@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+#/ Usage: bin/fmt [options]
+#/ Description: Formats code according to project standards
+#/ Options:
+#/   -c, --check    Check formatting without making changes
+#/   -v, --verbose  Verbose output
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+
+check=false
+
+while (( "$#" )); do
+    case "$1" in
+        -c|--check)
+            check=true
+            shift
+            ;;
+        -v|--verbose)
+            export VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if $check; then
+    print_color blue "Checking code formatting..."
+else
+    print_color blue "Formatting code..."
+fi
+
+success=true
+
+# JavaScript/TypeScript
+if [ -f "package.json" ]; then
+    if grep -q '"prettier"' package.json || [ -f ".prettierrc" ] || [ -f ".prettierrc.json" ]; then
+        cmd="npx prettier"
+        if $check; then
+            cmd="$cmd --check"
+        else
+            cmd="$cmd --write"
+        fi
+        if ! run_command "$cmd ." "Formatting JavaScript/TypeScript"; then
+            success=false
+        fi
+    fi
+    
+    if grep -q '"eslint"' package.json || [ -f ".eslintrc" ] || [ -f ".eslintrc.json" ]; then
+        cmd="npx eslint"
+        if ! $check; then
+            cmd="$cmd --fix"
+        fi
+        if ! run_command "$cmd ." "Linting JavaScript/TypeScript"; then
+            success=false
+        fi
+    fi
+fi
+
+# Python
+if command_exists black || command_exists ruff; then
+    if command_exists ruff; then
+        cmd="ruff format"
+        if $check; then
+            cmd="$cmd --check"
+        fi
+        if ! run_command "$cmd ." "Formatting Python with ruff"; then
+            success=false
+        fi
+    elif command_exists black; then
+        cmd="black"
+        if $check; then
+            cmd="$cmd --check"
+        fi
+        if ! run_command "$cmd ." "Formatting Python with black"; then
+            success=false
+        fi
+    fi
+    
+    if command_exists isort; then
+        cmd="isort"
+        if $check; then
+            cmd="$cmd --check-only"
+        fi
+        if ! run_command "$cmd ." "Sorting Python imports"; then
+            success=false
+        fi
+    fi
+fi
+
+# Ruby
+if [ -f "Gemfile" ] && command_exists rubocop; then
+    cmd="bundle exec rubocop"
+    if ! $check; then
+        cmd="$cmd --auto-correct"
+    fi
+    if ! run_command "$cmd" "Formatting Ruby"; then
+        success=false
+    fi
+fi
+
+# .NET
+if command_exists dotnet && (compgen -G "*.sln" > /dev/null || compgen -G "*.csproj" > /dev/null); then
+    args=()
+    if $check; then
+        args+=("--verify-no-changes")
+    fi
+    
+    # Find solution or project file
+    if compgen -G "*.sln" > /dev/null; then
+        target=$(ls *.sln | head -1)
+    else
+        target="."
+    fi
+    
+    if ! run_command "dotnet format whitespace \"$target\" ${args[*]}" "Formatting .NET whitespace"; then
+        success=false
+    fi
+    if ! run_command "dotnet format style \"$target\" ${args[*]}" "Formatting .NET style"; then
+        success=false
+    fi
+fi
+
+# Go
+if [ -f "go.mod" ] && command_exists gofmt; then
+    if $check; then
+        if [ -n "$(gofmt -l .)" ]; then
+            error "Go files need formatting"
+            gofmt -l .
+            success=false
+        fi
+    else
+        run_command "gofmt -w ." "Formatting Go"
+    fi
+    
+    if command_exists goimports; then
+        if $check; then
+            if [ -n "$(goimports -l .)" ]; then
+                error "Go imports need formatting"
+                success=false
+            fi
+        else
+            run_command "goimports -w ." "Formatting Go imports"
+        fi
+    fi
+fi
+
+# Rust
+if [ -f "Cargo.toml" ] && command_exists cargo; then
+    cmd="cargo fmt"
+    if $check; then
+        cmd="$cmd -- --check"
+    fi
+    if ! run_command "$cmd" "Formatting Rust"; then
+        success=false
+    fi
+fi
+
+# Shell scripts
+if command_exists shfmt; then
+    cmd="shfmt"
+    if $check; then
+        cmd="$cmd -d"
+    else
+        cmd="$cmd -w"
+    fi
+    if ! run_command "$cmd ." "Formatting shell scripts"; then
+        success=false
+    fi
+fi
+
+if $success; then
+    print_color green "✓ Formatting complete"
+else
+    if $check; then
+        print_color red "✗ Formatting issues found. Run 'bin/fmt' to fix."
+        exit 1
+    else
+        print_color red "✗ Some formatting failed"
+        exit 1
+    fi
+fi

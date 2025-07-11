@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+#/ Usage: bin/start [options]
+#/ Description: Starts the application in development mode
+#/ Options:
+#/   -p, --port PORT    Specify port (if applicable)
+#/   -e, --env ENV      Specify environment (default: development)
+#/   -v, --verbose      Verbose output
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+
+port=""
+env="development"
+
+while (( "$#" )); do
+    case "$1" in
+        -p|--port)
+            port="$2"
+            shift 2
+            ;;
+        -e|--env)
+            env="$2"
+            shift 2
+            ;;
+        -v|--verbose)
+            export VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+print_color blue "Starting application in $env mode..."
+
+# Node.js
+if [ -f "package.json" ]; then
+    if grep -q '"start"' package.json; then
+        cmd="npm start"
+        if [ -n "$port" ]; then
+            export PORT="$port"
+        fi
+        export NODE_ENV="$env"
+        run_command "$cmd" "Starting Node.js application"
+    elif grep -q '"dev"' package.json; then
+        run_command "npm run dev" "Starting Node.js application (dev mode)"
+    fi
+fi
+
+# Python Flask/Django
+if [ -f "manage.py" ]; then
+    # Django
+    cmd="python3 manage.py runserver"
+    if [ -n "$port" ]; then
+        cmd="$cmd 0.0.0.0:$port"
+    fi
+    run_command "$cmd" "Starting Django application"
+elif [ -f "app.py" ] || [ -f "main.py" ]; then
+    # Flask/FastAPI
+    if grep -q "flask" requirements.txt 2>/dev/null; then
+        export FLASK_ENV="$env"
+        export FLASK_APP="${FLASK_APP:-app.py}"
+        cmd="flask run"
+        if [ -n "$port" ]; then
+            cmd="$cmd --port $port"
+        fi
+        run_command "$cmd" "Starting Flask application"
+    elif grep -q "fastapi" requirements.txt 2>/dev/null; then
+        cmd="uvicorn main:app --reload"
+        if [ -n "$port" ]; then
+            cmd="$cmd --port $port"
+        fi
+        run_command "$cmd" "Starting FastAPI application"
+    else
+        run_command "python3 ${MAIN_FILE:-main.py}" "Starting Python application"
+    fi
+fi
+
+# Ruby
+if [ -f "Gemfile" ]; then
+    if [ -f "config.ru" ]; then
+        # Rack application (Rails, Sinatra)
+        cmd="bundle exec rackup"
+        if [ -n "$port" ]; then
+            cmd="$cmd -p $port"
+        fi
+        run_command "$cmd" "Starting Ruby application"
+    elif grep -q "rails" Gemfile; then
+        cmd="bundle exec rails server"
+        if [ -n "$port" ]; then
+            cmd="$cmd -p $port"
+        fi
+        run_command "$cmd" "Starting Rails application"
+    fi
+fi
+
+# .NET
+if compgen -G "*.csproj" > /dev/null; then
+    project=$(ls *.csproj | grep -v Test | head -1)
+    cmd="dotnet run --project $project"
+    if [ -n "$port" ]; then
+        export ASPNETCORE_URLS="http://localhost:$port"
+    fi
+    export ASPNETCORE_ENVIRONMENT="${env^}"  # Capitalize first letter
+    run_command "$cmd" "Starting .NET application"
+fi
+
+# Go
+if [ -f "go.mod" ] && [ -f "main.go" ]; then
+    cmd="go run main.go"
+    if [ -n "$port" ]; then
+        export PORT="$port"
+    fi
+    run_command "$cmd" "Starting Go application"
+fi
+
+# Docker Compose
+if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
+    run_command "docker-compose up" "Starting with Docker Compose"
+fi
+
+print_color green "✓ Application started"

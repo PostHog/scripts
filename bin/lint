@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+#/ Usage: bin/lint [options]
+#/ Description: Runs all linters and static analysis tools
+#/ Options:
+#/   --fix         Automatically fix issues where possible
+#/   -v, --verbose Verbose output
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+
+fix=false
+
+while (( "$#" )); do
+    case "$1" in
+        --fix)
+            fix=true
+            shift
+            ;;
+        -v|--verbose)
+            export VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+print_color blue "Running linters..."
+
+success=true
+
+# JavaScript/TypeScript
+if [ -f "package.json" ]; then
+    if grep -q '"eslint"' package.json || [ -f ".eslintrc" ] || [ -f ".eslintrc.json" ]; then
+        cmd="npx eslint ."
+        if $fix; then
+            cmd="$cmd --fix"
+        fi
+        if ! run_command "$cmd" "Linting JavaScript/TypeScript"; then
+            success=false
+        fi
+    fi
+    
+    if command_exists tsc && [ -f "tsconfig.json" ]; then
+        if ! run_command "npx tsc --noEmit" "Type checking TypeScript"; then
+            success=false
+        fi
+    fi
+fi
+
+# Python
+if command_exists ruff; then
+    cmd="ruff check"
+    if $fix; then
+        cmd="$cmd --fix"
+    fi
+    if ! run_command "$cmd ." "Linting Python with ruff"; then
+        success=false
+    fi
+elif command_exists flake8; then
+    if ! run_command "flake8 ." "Linting Python with flake8"; then
+        success=false
+    fi
+elif command_exists pylint; then
+    if ! run_command "pylint **/*.py" "Linting Python with pylint"; then
+        success=false
+    fi
+fi
+
+if command_exists mypy && [ -f "mypy.ini" ]; then
+    if ! run_command "mypy ." "Type checking Python"; then
+        success=false
+    fi
+fi
+
+# Ruby
+if [ -f "Gemfile" ] && command_exists rubocop; then
+    cmd="bundle exec rubocop"
+    if $fix; then
+        cmd="$cmd --auto-correct"
+    fi
+    if ! run_command "$cmd" "Linting Ruby"; then
+        success=false
+    fi
+fi
+
+# Go
+if [ -f "go.mod" ]; then
+    if command_exists golangci-lint; then
+        cmd="golangci-lint run"
+        if $fix; then
+            cmd="$cmd --fix"
+        fi
+        if ! run_command "$cmd" "Linting Go with golangci-lint"; then
+            success=false
+        fi
+    else
+        if ! run_command "go vet ./..." "Running go vet"; then
+            success=false
+        fi
+    fi
+fi
+
+# Rust
+if [ -f "Cargo.toml" ] && command_exists cargo; then
+    if ! run_command "cargo clippy -- -D warnings" "Linting Rust with clippy"; then
+        success=false
+    fi
+fi
+
+# Shell scripts
+if command_exists shellcheck; then
+    if ! run_command "shellcheck bin/*" "Linting shell scripts"; then
+        success=false
+    fi
+fi
+
+# Markdown
+if command_exists markdownlint; then
+    if ! run_command "markdownlint '**/*.md'" "Linting Markdown"; then
+        success=false
+    fi
+fi
+
+# YAML
+if command_exists yamllint; then
+    if ! run_command "yamllint ." "Linting YAML"; then
+        success=false
+    fi
+fi
+
+if $success; then
+    print_color green "✓ All linters passed"
+else
+    print_color red "✗ Linting issues found"
+    exit 1
+fi

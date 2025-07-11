@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#/ Usage: bin/test [options] [test-args]
+#/ Description: Runs the test suite
+#/ Options:
+#/   -c, --coverage    Run with coverage reporting
+#/   -w, --watch      Run in watch mode
+#/   -v, --verbose    Verbose output
+
+source bin/helpers/_utils.sh
+set_source_and_root_dir
+
+coverage=false
+watch=false
+test_args=()
+
+while (( "$#" )); do
+    case "$1" in
+        -c|--coverage)
+            coverage=true
+            shift
+            ;;
+        -w|--watch)
+            watch=true
+            shift
+            ;;
+        -v|--verbose)
+            export VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            test_args+=("$1")
+            shift
+            ;;
+    esac
+done
+
+print_color blue "Running tests..."
+
+# Node.js
+if [ -f "package.json" ]; then
+    if grep -q '"test"' package.json; then
+        cmd="npm test"
+        if $coverage && grep -q '"test:coverage"' package.json; then
+            cmd="npm run test:coverage"
+        fi
+        if $watch && grep -q '"test:watch"' package.json; then
+            cmd="npm run test:watch"
+        fi
+        run_command "$cmd ${test_args[*]}" "Running Node.js tests"
+    fi
+fi
+
+# Python
+if [ -f "pytest.ini" ] || [ -f "setup.cfg" ] || [ -f "pyproject.toml" ]; then
+    if command_exists pytest; then
+        cmd="pytest"
+        if $coverage; then
+            cmd="$cmd --cov"
+        fi
+        if $watch && command_exists ptw; then
+            cmd="ptw"
+        fi
+        run_command "$cmd ${test_args[*]}" "Running Python tests"
+    fi
+elif [ -d "tests" ] || [ -d "test" ]; then
+    run_command "python3 -m unittest discover ${test_args[*]}" "Running Python tests"
+fi
+
+# Ruby
+if [ -f "Gemfile" ] && grep -q "rspec" Gemfile; then
+    cmd="bundle exec rspec"
+    if $coverage; then
+        cmd="COVERAGE=true $cmd"
+    fi
+    run_command "$cmd ${test_args[*]}" "Running Ruby tests"
+fi
+
+# .NET
+if compgen -G "*.sln" > /dev/null || compgen -G "*Tests.csproj" > /dev/null; then
+    cmd="dotnet test"
+    if $coverage; then
+        cmd="$cmd --collect:\"XPlat Code Coverage\""
+    fi
+    run_command "$cmd ${test_args[*]}" "Running .NET tests"
+fi
+
+# Go
+if [ -f "go.mod" ]; then
+    cmd="go test ./..."
+    if $coverage; then
+        cmd="$cmd -cover"
+    fi
+    if [ "$VERBOSE" = "1" ]; then
+        cmd="$cmd -v"
+    fi
+    run_command "$cmd ${test_args[*]}" "Running Go tests"
+fi
+
+# Rust
+if [ -f "Cargo.toml" ]; then
+    cmd="cargo test"
+    if [ "$VERBOSE" = "1" ]; then
+        cmd="$cmd --verbose"
+    fi
+    run_command "$cmd ${test_args[*]}" "Running Rust tests"
+fi
+
+print_color green "✓ Tests completed"

@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Test outputs
+coverage/
+.coverage
+htmlcov/
+
+# Build outputs
+dist/
+build/
+target/
+*.egg-info/
+
+# Dependencies (for testing the scripts)
+node_modules/
+venv/
+.venv/
+vendor/
+
+# Temporary files
+*.tmp
+.cache/
