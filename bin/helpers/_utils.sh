@@ -2,14 +2,14 @@
 
 # Common utility functions for scripts
 
-# Print error message to stderr
+# Print error to stderr in red
 error() {
-    echo "$@" >&2
+    echo -e "\033[31mError: $*\033[0m" >&2
 }
 
-# Print error message and exit with status 1
+# Print error and exit
 fatal() {
-    error "$@"
+    error "$*"
     exit 1
 }
 
@@ -18,7 +18,7 @@ set_source_and_root_dir() {
     { set +x; } 2>/dev/null
     source_dir="$( cd -P "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
     root_dir=$(cd "$source_dir" && cd ../ && pwd)
-    cd $root_dir
+    cd "$root_dir"
 }
 
 # Check if command exists
@@ -26,88 +26,44 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Detect OS type
-detect_os() {
-    case "$(uname -s)" in
-        Darwin*)    echo "macos";;
-        Linux*)     echo "linux";;
-        CYGWIN*|MINGW*|MSYS*) echo "windows";;
-        *)          echo "unknown";;
-    esac
-}
-
-# Print colored output
+# Print colored text
 print_color() {
-    local color=$1
-    shift
-    case $color in
-        red)    echo -e "\033[0;31m$@\033[0m";;
-        green)  echo -e "\033[0;32m$@\033[0m";;
-        yellow) echo -e "\033[0;33m$@\033[0m";;
-        blue)   echo -e "\033[0;34m$@\033[0m";;
-        *)      echo "$@";;
+    case $1 in
+        red)    echo -e "\033[31m$2\033[0m";;
+        green)  echo -e "\033[32m$2\033[0m";;
+        yellow) echo -e "\033[33m$2\033[0m";;
+        blue)   echo -e "\033[34m$2\033[0m";;
+        *)      echo "$2";;
     esac
 }
 
-# Run command with optional verbose output
-run_command() {
-    local cmd="$1"
-    local description="$2"
-    
-    if [ -n "$description" ]; then
-        echo "→ $description"
-    fi
-    
-    if [ -n "$VERBOSE" ]; then
-        echo "  Running: $cmd"
-    fi
-    
-    eval "$cmd"
-    local status=$?
-    
-    if [ $status -ne 0 ]; then
-        error "Command failed: $cmd"
-        return $status
-    fi
-    
-    return 0
+# Print warning in yellow
+warning() {
+    echo -e "\033[33mWarning: $*\033[0m" >&2
 }
 
-# Check for required commands
+# Print success in green
+success() {
+    echo -e "\033[32m✓ $*\033[0m"
+}
+
+# Run command with description
+run_command() {
+    echo "→ ${2:-Running command}"
+    [ "$VERBOSE" ] && echo "  $1"
+    $1 || fatal "Command failed: $1"
+}
+
+# Check required commands exist
 require_commands() {
     local missing=()
-    
     for cmd in "$@"; do
-        if ! command_exists "$cmd"; then
-            missing+=("$cmd")
-        fi
+        command_exists "$cmd" || missing+=("$cmd")
     done
-    
-    if [ ${#missing[@]} -ne 0 ]; then
-        fatal "Required commands not found: ${missing[*]}"
-    fi
+    [ ${#missing[@]} -eq 0 ] || fatal "Missing commands: ${missing[*]}"
 }
 
-# Show help text from script header
+# Show help from script comments
 show_help() {
-    grep '^#/' "$0" | cut -c4-
-}
-
-# Parse common arguments
-parse_common_args() {
-    while (( "$#" )); do
-        case "$1" in
-            -v|--verbose)
-                export VERBOSE=1
-                shift
-                ;;
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            *)
-                break
-                ;;
-        esac
-    done
+    sed -n 's/^#\/ \?//p' "$0"
 }
