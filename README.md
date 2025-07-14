@@ -9,7 +9,7 @@ A standardized project template for consistent development workflows across all 
 1. **Clone from Template**: Use GitHub's "Use this template" button or clone directly:
 
 ```bash
-git clone https://github.com/PostHog/scripts.git your-project-name
+git clone https://github.com/PostHog/template.git your-project-name
 cd your-project-name
 ```
 
