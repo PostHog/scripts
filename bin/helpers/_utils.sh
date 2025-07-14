@@ -2,9 +2,20 @@
 
 # Common utility functions for scripts
 
+# Print colored text
+print_color() {
+    case $1 in
+        red)    echo -e "\033[31m$2\033[0m";;
+        green)  echo -e "\033[32m$2\033[0m";;
+        yellow) echo -e "\033[33m$2\033[0m";;
+        blue)   echo -e "\033[34m$2\033[0m";;
+        *)      echo "$2";;
+    esac
+}
+
 # Print error to stderr in red
 error() {
-    echo -e "\033[31mError: $*\033[0m" >&2
+    print_color red "Error: $*" >&2
 }
 
 # Print error and exit
@@ -26,25 +37,14 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Print colored text
-print_color() {
-    case $1 in
-        red)    echo -e "\033[31m$2\033[0m";;
-        green)  echo -e "\033[32m$2\033[0m";;
-        yellow) echo -e "\033[33m$2\033[0m";;
-        blue)   echo -e "\033[34m$2\033[0m";;
-        *)      echo "$2";;
-    esac
-}
-
 # Print warning in yellow
 warning() {
-    echo -e "\033[33mWarning: $*\033[0m" >&2
+    print_color yellow "Warning: $*" >&2
 }
 
 # Print success in green
 success() {
-    echo -e "\033[32m✓ $*\033[0m"
+    print_color green "✓ $*"
 }
 
 # Run command with description
