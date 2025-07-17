@@ -67,3 +67,51 @@ require_commands() {
 show_help() {
     sed -n 's/^#\/ \?//p' "$0"
 }
+
+# Find process using a port
+# Usage: find_port_process <port>
+# Outputs: "pid:process_name" if found, nothing if not found
+# Example: result=$(find_port_process 8080); if [ -n "$result" ]; then echo "Found: $result"; fi
+find_port_process() {
+    local port=$1
+    local pid=""
+    
+    # Validate input
+    [ -n "$port" ] || return 0
+    
+    # Helper function to format output
+    format_output() {
+        local pid=$1
+        [ -n "$pid" ] && [ "$pid" != "-" ] || return 1
+        local process_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+        echo "$pid:$process_name"
+        return 0
+    }
+    
+    # Try lsof first (most reliable)
+    if command_exists lsof; then
+        pid=$(lsof -ti ":$port" 2>/dev/null | head -1)
+        format_output "$pid" && return 0
+    fi
+    
+    # Try ss (Linux)
+    if command_exists ss; then
+        pid=$(ss -tlnp 2>/dev/null | grep ":$port " | head -1 | grep -o 'pid=[0-9]*' | cut -d= -f2)
+        format_output "$pid" && return 0
+    fi
+    
+    # Try netstat (fallback)
+    if command_exists netstat; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS: netstat output format is different
+            pid=$(netstat -anv 2>/dev/null | grep "\\.$port " | grep LISTEN | awk '{print $9}' | head -1)
+        else
+            # Linux: extract PID from netstat
+            pid=$(netstat -tlnp 2>/dev/null | grep ":$port " | head -1 | awk '{print $7}' | cut -d/ -f1)
+        fi
+        format_output "$pid" && return 0
+    fi
+    
+    # No process found
+    return 0
+}
