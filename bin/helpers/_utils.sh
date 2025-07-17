@@ -77,7 +77,10 @@ find_port_process() {
     local pid=""
     
     # Validate input
-    [ -n "$port" ] || return 0
+    if [ -z "$port" ]; then
+        echo "Error: Port number required" >&2
+        return 1
+    fi
     
     # Helper function to format output
     format_output() {
